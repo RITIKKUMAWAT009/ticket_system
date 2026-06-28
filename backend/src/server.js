@@ -4,14 +4,12 @@ const logger = require('./utils/logger');
 
 const app = createApp();
 
-if (require.main === module) {
-  const PORT = process.env.PORT || config.port || 3000;
+const PORT = process.env.PORT || config.port || 3000;
 
-  app.listen(PORT, '0.0.0.0', () => {
-    logger.info(`Server running on port ${PORT}`);
-    logger.info(`Swagger docs: ${config.apiBaseUrl}/api-docs`);
-    logger.info(`Environment: ${config.nodeEnv}`);
-  });
-}
+app.listen(PORT, '0.0.0.0', () => {
+  logger.info(`Server running on port ${PORT}`);
+  logger.info(`Swagger docs: ${config.apiBaseUrl}/api-docs`);
+  logger.info(`Environment: ${config.nodeEnv}`);
+});
 
 module.exports = app;
