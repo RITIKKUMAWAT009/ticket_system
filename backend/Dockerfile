@@ -1,26 +1,31 @@
-FROM node:20-alpine AS base
+FROM node:20-alpine
+
 WORKDIR /app
 
-# Install system deps for Prisma + OpenSSL
+# Required by Prisma
 RUN apk add --no-cache openssl
 
 # Install dependencies
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
-# Copy full project
+# Copy source code
 COPY . .
 
-# Prisma generate
+# Generate Prisma client
 RUN npx prisma generate
 
-# Optional: run as non-root user
-RUN addgroup --system nodejs && adduser --system expressjs
+# Create non-root user
+RUN addgroup -S nodejs && adduser -S expressjs -G nodejs
+
+# Create uploads directory
+RUN mkdir -p uploads
+
+# Fix permissions
 RUN chown -R expressjs:nodejs /app
 
 USER expressjs
 
 EXPOSE 3000
 
-# Run migrations + server
 CMD ["sh", "-c", "npx prisma migrate deploy && node src/server.js"]
