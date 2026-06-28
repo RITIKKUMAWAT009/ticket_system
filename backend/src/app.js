@@ -18,7 +18,7 @@ const notificationRoutes = require('./modules/notifications/notification.routes'
 
 function createApp() {
   const app = express();
-
+  app.set('trust proxy', 1);
   // ----------------------------
   // Security Headers
   // ----------------------------
