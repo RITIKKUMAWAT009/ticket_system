@@ -1,0 +1,199 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CITIZEN
+  SUPPORT_AGENT
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum TicketStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  REOPENED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum Platform {
+  ANDROID
+  WEB
+  IOS
+}
+
+model User {
+  id              String    @id @default(uuid())
+  mobileNumber    String    @unique @db.VarChar(10)
+  fullName        String
+  fatherName      String
+  email           String    @unique
+  aadhaarNumber   String?   @unique
+  passportNumber  String?   @unique
+  gender          Gender
+  role            Role      @default(CITIZEN)
+  profileImageUrl String?
+  createdAt       DateTime  @default(now())
+
+  tickets         Ticket[]         @relation("CitizenTickets")
+  comments        TicketComment[]
+  notifications   Notification[]
+  deviceTokens    DeviceToken[]
+  otpSessions     OtpSession[]
+
+  @@map("users")
+}
+
+// Infrastructure table for OTP verification flow (not a business entity)
+model OtpSession {
+  id           String   @id @default(uuid())
+  mobileNumber String   @db.VarChar(10)
+  otp          String
+  expiresAt    DateTime
+  verified     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+
+  @@index([mobileNumber])
+  @@map("otp_sessions")
+}
+
+model District {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  tehsils   Tehsil[]
+  tickets   Ticket[]
+
+  @@map("districts")
+}
+
+model Tehsil {
+  id         String    @id @default(uuid())
+  districtId String
+  name       String
+  district   District  @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  projects   Project[]
+  tickets    Ticket[]
+
+  @@unique([districtId, name])
+  @@map("tehsils")
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  tehsilId    String
+  name        String
+  description String?
+  tehsil      Tehsil   @relation(fields: [tehsilId], references: [id], onDelete: Cascade)
+  tickets     Ticket[]
+
+  @@unique([tehsilId, name])
+  @@map("projects")
+}
+
+model Ticket {
+  id           String         @id @default(uuid())
+  ticketNumber String         @unique
+  citizenId    String
+  districtId   String
+  tehsilId     String
+  projectId    String
+  remarks      String
+  status       TicketStatus   @default(OPEN)
+  priority     TicketPriority @default(MEDIUM)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  // TODO: Schema does not define assignedAgentId — required for Admin assignment
+  // and Support Agent "view assigned tickets". Clarify with stakeholders.
+  assignedAgentId String?
+
+  citizen      User            @relation("CitizenTickets", fields: [citizenId], references: [id])
+  district     District        @relation(fields: [districtId], references: [id])
+  tehsil       Tehsil          @relation(fields: [tehsilId], references: [id])
+  project      Project         @relation(fields: [projectId], references: [id])
+  comments     TicketComment[]
+  attachments  Attachment[]
+  notifications Notification[]
+
+  @@index([citizenId])
+  @@index([status])
+  @@index([assignedAgentId])
+  @@map("tickets")
+}
+
+model TicketComment {
+  id        String   @id @default(uuid())
+  ticketId  String
+  userId    String
+  message   String
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([ticketId])
+  @@map("ticket_comments")
+}
+
+model Attachment {
+  id         String   @id @default(uuid())
+  ticketId   String
+  fileName   String
+  fileUrl    String
+  fileSize   Int
+  uploadedAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("attachments")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  body      String
+  ticketId  String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticket Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model DeviceToken {
+  id       String   @id @default(uuid())
+  userId   String
+  fcmToken String   @unique
+  platform Platform
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
+}
